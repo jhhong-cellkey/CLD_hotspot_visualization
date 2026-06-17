@@ -2,96 +2,490 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>CHO IGV.js Demo</title>
+  <title>CHO Hotspot Genome Browser</title>
+
   <style>
+    :root {
+      --bg: #f6f7f9;
+      --panel: #ffffff;
+      --border: #e2e6ea;
+      --text: #1f2933;
+      --muted: #6b7280;
+      --label: #334155;
+    }
+
     body {
-      font-family: Arial, sans-serif;
-      margin: 24px;
+      margin: 0;
+      padding: 28px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    .page {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .header {
+      margin-bottom: 16px;
+    }
+
+    .header h2 {
+      margin: 0 0 6px 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .header p {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .browser-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
     }
 
     #igv-div {
-      border: 1px solid #ddd;
-      padding: 8px;
+      min-height: 720px;
+    }
+
+    .sequence-preview {
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 180px;
+      overflow-y: auto;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+
+    /*
+      IGV 기본 track label box를 덜 촌스럽게 보이게 하는 CSS.
+      igv.js 버전에 따라 class명이 조금 다를 수 있음.
+    */
+    .igv-track-label {
+      background: rgba(255, 255, 255, 0.85) !important;
+      border: 1px solid #d7dde5 !important;
+      border-radius: 6px !important;
+      color: #334155 !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      padding: 2px 7px !important;
+      box-shadow: none !important;
+    }
+
+    .igv-trackgear-container,
+    .igv-track-menu-container {
+      opacity: 0.25;
+    }
+
+    .igv-trackgear-container:hover,
+    .igv-track-menu-container:hover {
+      opacity: 0.8;
+    }
+
+    .igv-track-div {
+      border-bottom: 1px solid #eef1f4 !important;
+    }
+
+    .igv-scrollbar-outer-div {
+      background: #f8fafc !important;
+    }
+
+    .igv-navbar {
+      border-radius: 10px !important;
+      border: 1px solid #e5e7eb !important;
+      background: #ffffff !important;
+      margin-bottom: 10px !important;
     }
   </style>
 </head>
-<body>
-  <h2>CHO Hotspot IGV.js Demo</h2>
-  <p>Demo locus: NW_023276806.1:70,000-130,000</p>
 
-  <div id="igv-div"></div>
+<body>
+  <div class="page">
+    <div class="header">
+      <h2>CHO Hotspot Genome Browser</h2>
+      <p>Reference: CHO PICRH genome · Demo locus: NW_023276806.1:70,000-130,000</p>
+    </div>
+
+    <div class="browser-card">
+      <div id="igv-div"></div>
+    </div>
+  </div>
 
   <script type="module">
     import igv from "./vendor/igv.esm.min.js";
 
+    const fastaURL = "data/genome/PICRH.fa";
+    const faiURL = "data/genome/PICRH.fa.fai";
+
     const options = {
       reference: {
         id: "CHO_DEMO",
-        name: "CHO demo genome",
-        fastaURL: "data/genome/PICRH.fa",
-        indexURL: "data/genome/PICRH.fa.fai"
+        name: "CHO PICRH",
+        fastaURL: fastaURL,
+        indexURL: faiURL
       },
 
       locus: "NW_023276806.1:70000-130000",
 
       tracks: [
         {
-          name: "Genes",
+          name: "Gene annotation",
           type: "annotation",
           format: "gff3",
-          url: "data/tracks/genomic.gff",
+          url: "data/tracks/genomic.no_region.gff",
           displayMode: "EXPANDED",
-          nameField: "Name",
-          height: 120
+          nameField: "gene",
+          height: 150,
+          color: "#2F3A4A"
         },
+
         {
-          name: "Hotspot candidates",
+          name: "Hotspots",
           type: "annotation",
           format: "bed",
           url: "data/tracks/hotspots.bed",
-          displayMode: "EXPANDED",
-          height: 60
+          displayMode: "SQUISHED",
+          height: 45,
+          color: "#8B5CF6"
         },
+
         {
-          name: "RNA expression (GSE19750)",
+          name: "RNA expression",
           type: "annotation",
           format: "bed",
           url: "data/tracks/GSE19750_all_samples.bed",
           displayMode: "SQUISHED",
-          colorBy: "score",
-          height: 100
+          height: 60,
+          color: "#2F80ED"
         },
+
         {
-          name: "ChIP-seq Tp5 H3K4me3",
+          name: "H3K4me3",
           type: "wig",
           format: "bigwig",
           url: "data/tracks/Tp5_H3K4me3.bw",
           autoscale: true,
-          height: 80
+          height: 72,
+          color: "#B22222"
         },
+
         {
-          name: "ChIP-seq Tp5 H3K9me3",
+          name: "H3K9me3",
           type: "wig",
           format: "bigwig",
           url: "data/tracks/Tp5_H3K9me3.bw",
           autoscale: true,
-          height: 80
+          height: 72,
+          color: "#1F2A44"
         },
+
         {
-          name: "ChIP-seq Tp5 H3K27ac",
+          name: "H3K27ac",
           type: "wig",
           format: "bigwig",
           url: "data/tracks/Tp5_H3K27ac.bw",
           autoscale: true,
-          height: 80
+          height: 72,
+          color: "#E07A5F"
         }
       ]
+    };
+
+    let faiIndex = null;
+    window.sequenceRequests = {};
+
+    function escapeHtml(value) {
+      if (value === undefined || value === null) return "";
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function getPopoverValue(popoverData, possibleNames) {
+      for (const item of popoverData) {
+        if (!item || !item.name) continue;
+
+        const itemName = String(item.name).toLowerCase();
+
+        for (const name of possibleNames) {
+          if (itemName === name.toLowerCase()) {
+            return item.value;
+          }
+        }
+      }
+      return "";
+    }
+
+    function parseLocation(locationText) {
+      if (!locationText) return null;
+
+      const clean = String(locationText).replaceAll(",", "").trim();
+      const match = clean.match(/^([^:]+):(\d+)-(\d+)/);
+
+      if (!match) return null;
+
+      const chrom = match[1];
+      const start1 = Number(match[2]);
+      const end = Number(match[3]);
+
+      return {
+        chrom,
+        start1,
+        start0: start1 - 1,
+        end,
+        length: end - start1 + 1
+      };
+    }
+
+    async function loadFaiIndex() {
+      if (faiIndex) return faiIndex;
+
+      const response = await fetch(faiURL);
+      if (!response.ok) {
+        throw new Error("Failed to load FAI: " + faiURL);
+      }
+
+      const text = await response.text();
+      const index = {};
+
+      for (const line of text.trim().split(/\r?\n/)) {
+        const cols = line.split("\t");
+        if (cols.length < 5) continue;
+
+        index[cols[0]] = {
+          length: Number(cols[1]),
+          offset: Number(cols[2]),
+          lineBases: Number(cols[3]),
+          lineWidth: Number(cols[4])
+        };
+      }
+
+      faiIndex = index;
+      return faiIndex;
+    }
+
+    async function fetchFastaSequence(chrom, start0, end0) {
+      const index = await loadFaiIndex();
+      const rec = index[chrom];
+
+      if (!rec) {
+        throw new Error("Contig not found in FAI: " + chrom);
+      }
+
+      if (start0 < 0) start0 = 0;
+      if (end0 > rec.length) end0 = rec.length;
+
+      if (end0 <= start0) {
+        throw new Error("Invalid region: " + chrom + ":" + start0 + "-" + end0);
+      }
+
+      const byteStart =
+        rec.offset +
+        Math.floor(start0 / rec.lineBases) * rec.lineWidth +
+        (start0 % rec.lineBases);
+
+      const lastBase0 = end0 - 1;
+
+      const byteEnd =
+        rec.offset +
+        Math.floor(lastBase0 / rec.lineBases) * rec.lineWidth +
+        (lastBase0 % rec.lineBases);
+
+      const response = await fetch(fastaURL, {
+        headers: {
+          Range: `bytes=${byteStart}-${byteEnd}`
+        }
+      });
+
+      if (!response.ok && response.status !== 206) {
+        throw new Error("Failed to fetch FASTA range");
+      }
+
+      const text = await response.text();
+
+      return text
+        .replace(/[\r\n]/g, "")
+        .toUpperCase()
+        .slice(0, end0 - start0);
+    }
+
+    function reverseComplement(seq) {
+      const comp = {
+        A: "T",
+        T: "A",
+        G: "C",
+        C: "G",
+        N: "N",
+        a: "t",
+        t: "a",
+        g: "c",
+        c: "g",
+        n: "n"
+      };
+
+      return seq
+        .split("")
+        .reverse()
+        .map(base => comp[base] || "N")
+        .join("")
+        .toUpperCase();
+    }
+
+    window.loadGeneSequenceFromRegion = async function (requestId) {
+      const req = window.sequenceRequests[requestId];
+      const target = document.getElementById("seq-" + requestId);
+
+      if (!req || !target) return;
+
+      target.textContent = "Loading sequence from FASTA...";
+
+      try {
+        const previewLength = 1000;
+        const previewStart0 = req.start0;
+        const previewEnd0 = Math.min(req.end, req.start0 + previewLength);
+
+        let seq = await fetchFastaSequence(
+          req.chrom,
+          previewStart0,
+          previewEnd0
+        );
+
+        if (req.strand === "-") {
+          seq = reverseComplement(seq);
+        }
+
+        target.innerHTML = `
+          <div>
+            <b>Sequence preview</b>:
+            first ${seq.length} bp / full ${req.length} bp
+          </div>
+          <div class="sequence-preview">${escapeHtml(seq)}</div>
+        `;
+      } catch (error) {
+        console.error(error);
+        target.textContent = "Sequence load failed: " + error.message;
+      }
     };
 
     igv.createBrowser(document.getElementById("igv-div"), options)
       .then(function (browser) {
         window.igvBrowser = browser;
         console.log("IGV browser created", browser);
+
+        browser.on("trackclick", function (track, popoverData) {
+          if (!track || track.name !== "Gene annotation") {
+            return;
+          }
+
+          console.log("Clicked track:", track.name);
+          console.log("Popover data:", popoverData);
+
+          const name = getPopoverValue(popoverData, ["Name"]);
+          const gene = getPopoverValue(popoverData, ["gene", "gene_name"]);
+          const type = getPopoverValue(popoverData, ["Type"]);
+
+          let chrom = getPopoverValue(popoverData, ["chrom"]);
+          let start0 = Number(getPopoverValue(popoverData, ["start0"]));
+          let start1 = Number(getPopoverValue(popoverData, ["start1"]));
+          let end = Number(getPopoverValue(popoverData, ["end"]));
+          let strand = getPopoverValue(popoverData, ["strand"]) || ".";
+
+          if (!chrom || !Number.isFinite(start0) || !Number.isFinite(end)) {
+            const locationText = getPopoverValue(popoverData, ["Location"]);
+            const region = parseLocation(locationText);
+
+            if (region) {
+              chrom = region.chrom;
+              start0 = region.start0;
+              start1 = region.start1;
+              end = region.end;
+            }
+          }
+
+          const length = end - start0;
+
+          let html = `
+            <div style="max-width: 760px; font-size: 13px;">
+              <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+                Gene information
+              </div>
+          `;
+
+          for (const item of popoverData) {
+            if (!item || !item.name) continue;
+
+            html += `
+              <div>
+                <b>${escapeHtml(item.name)}</b>: ${escapeHtml(item.value)}
+              </div>
+            `;
+          }
+
+          html += `<hr/>`;
+
+          if (!chrom || !Number.isFinite(start0) || !Number.isFinite(end)) {
+            html += `
+              <div style="font-weight: 700;">Gene sequence</div>
+              <div style="color: #b00020;">
+                Could not parse gene location.
+              </div>
+            </div>
+            `;
+            return html;
+          }
+
+          const requestId = "gene_" + Math.random().toString(36).slice(2);
+
+          window.sequenceRequests[requestId] = {
+            name,
+            gene,
+            type,
+            chrom,
+            start0,
+            start1,
+            end,
+            strand,
+            length
+          };
+
+          html += `
+            <div style="font-weight: 700;">Gene sequence</div>
+            <div><b>Gene</b>: ${escapeHtml(gene || name || "unknown")}</div>
+            <div><b>Feature name</b>: ${escapeHtml(name || "")}</div>
+            <div><b>Feature type</b>: ${escapeHtml(type || "")}</div>
+            <div><b>Location</b>: ${escapeHtml(chrom)}:${escapeHtml(start1)}-${escapeHtml(end)} (${escapeHtml(strand)})</div>
+            <div><b>Length</b>: ${escapeHtml(length)} bp</div>
+
+            <button onclick="window.loadGeneSequenceFromRegion('${requestId}')">
+              Load sequence preview
+            </button>
+
+            <div id="seq-${requestId}" style="margin-top: 8px; color: #667085;">
+              Click the button to load sequence.
+            </div>
+          `;
+
+          html += `</div>`;
+
+          return html;
+        });
       })
       .catch(function (error) {
         console.error("IGV failed to load", error);
