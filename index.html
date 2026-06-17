@@ -163,12 +163,22 @@
           color: "#8B5CF6"
         },
 
+        // {
+        //   name: "RNA expression",
+        //   type: "annotation",
+        //   format: "bed",
+        //   url: "data/tracks/GSE19750_all_samples.bed",
+        //   displayMode: "SQUISHED",
+        //   height: 60,
+        //   color: "#2F80ED"
+        // },
+
         {
           name: "RNA expression",
-          type: "annotation",
-          format: "bed",
-          url: "data/tracks/GSE19750_all_samples.bed",
-          displayMode: "SQUISHED",
+          type: "wig",
+          format: "bigwig",
+          url: "data/tracks/RNAseq_mean_CPM.bw",
+          autoscale: true,
           height: 60,
           color: "#2F80ED"
         },
