@@ -1,0 +1,12 @@
+# Local data files and symlinks (create on your machine; see data/README.md)
+data/*
+
+# Keep directory structure
+!data/genome/.gitkeep
+!data/tracks/.gitkeep
+!data/sequences/.gitkeep
+!data/README.md
+
+__pycache__/
+*.pyc
+.DS_Store

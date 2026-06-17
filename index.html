@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>CHO IGV.js Demo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+    }
+
+    #igv-div {
+      border: 1px solid #ddd;
+      padding: 8px;
+    }
+  </style>
+</head>
+<body>
+  <h2>CHO Hotspot IGV.js Demo</h2>
+  <p>Demo locus: NW_023276806.1:70,000-130,000</p>
+
+  <div id="igv-div"></div>
+
+  <script type="module">
+    import igv from "./vendor/igv.esm.min.js";
+
+    const options = {
+      reference: {
+        id: "CHO_DEMO",
+        name: "CHO demo genome",
+        fastaURL: "data/genome/PICRH.fa",
+        indexURL: "data/genome/PICRH.fa.fai"
+      },
+
+      locus: "NW_023276806.1:70000-130000",
+
+      tracks: [
+        {
+          name: "Genes",
+          type: "annotation",
+          format: "gff3",
+          url: "data/tracks/genomic.gff",
+          displayMode: "EXPANDED",
+          nameField: "Name",
+          height: 120
+        },
+        {
+          name: "Hotspot candidates",
+          type: "annotation",
+          format: "bed",
+          url: "data/tracks/hotspots.bed",
+          displayMode: "EXPANDED",
+          height: 60
+        },
+        {
+          name: "RNA expression (GSE19750)",
+          type: "annotation",
+          format: "bed",
+          url: "data/tracks/GSE19750_all_samples.bed",
+          displayMode: "SQUISHED",
+          colorBy: "score",
+          height: 100
+        },
+        {
+          name: "ChIP-seq Tp5 H3K4me3",
+          type: "wig",
+          format: "bigwig",
+          url: "data/tracks/Tp5_H3K4me3.bw",
+          autoscale: true,
+          height: 80
+        },
+        {
+          name: "ChIP-seq Tp5 H3K9me3",
+          type: "wig",
+          format: "bigwig",
+          url: "data/tracks/Tp5_H3K9me3.bw",
+          autoscale: true,
+          height: 80
+        },
+        {
+          name: "ChIP-seq Tp5 H3K27ac",
+          type: "wig",
+          format: "bigwig",
+          url: "data/tracks/Tp5_H3K27ac.bw",
+          autoscale: true,
+          height: 80
+        }
+      ]
+    };
+
+    igv.createBrowser(document.getElementById("igv-div"), options)
+      .then(function (browser) {
+        window.igvBrowser = browser;
+        console.log("IGV browser created", browser);
+      })
+      .catch(function (error) {
+        console.error("IGV failed to load", error);
+        document.getElementById("igv-div").textContent =
+          "IGV load failed: " + error.message;
+      });
+  </script>
+</body>
+</html>
