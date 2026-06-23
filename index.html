@@ -2,6 +2,9 @@
 <html>
 <head>
   <meta charset="utf-8" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>CHO Hotspot Genome Browser</title>
 
   <style>
@@ -56,21 +59,6 @@
       min-height: 720px;
     }
 
-    .sequence-preview {
-      white-space: pre-wrap;
-      word-break: break-all;
-      max-height: 180px;
-      overflow-y: auto;
-      background: #f8fafc;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
-      padding: 10px;
-      font-family: "SFMono-Regular", Consolas, monospace;
-      font-size: 12px;
-      margin-top: 8px;
-      line-height: 1.45;
-    }
-
     /*
       IGV 기본 track label box를 덜 촌스럽게 보이게 하는 CSS.
       igv.js 버전에 따라 class명이 조금 다를 수 있음.
@@ -110,6 +98,11 @@
       background: #ffffff !important;
       margin-bottom: 10px !important;
     }
+
+    /* Hotspots 트랙: feature를 세로로 크게 */
+    .igv-hotspot-track .igv-feature {
+      opacity: 0.95;
+    }
   </style>
 </head>
 
@@ -117,7 +110,7 @@
   <div class="page">
     <div class="header">
       <h2>CHO Hotspot Genome Browser</h2>
-      <p>Reference: CHO PICRH genome · Demo locus: NW_023276806.1:70,000-130,000</p>
+      <p>Reference: CHO PICRH genome · Hotspot_1 locus: NW_023276806.1:81,476,323-82,076,323 (±300 kb from 81,776,323)</p>
     </div>
 
     <div class="browser-card">
@@ -130,6 +123,7 @@
 
     const fastaURL = "data/genome/PICRH.fa";
     const faiURL = "data/genome/PICRH.fa.fai";
+    const initialLocus = "NW_023276806.1:81476323-82076323";
 
     const options = {
       reference: {
@@ -139,7 +133,7 @@
         indexURL: faiURL
       },
 
-      locus: "NW_023276806.1:70000-130000",
+      locus: initialLocus,
 
       tracks: [
         {
@@ -157,10 +151,13 @@
           name: "Hotspots",
           type: "annotation",
           format: "bed",
-          url: "data/tracks/hotspots.bed",
-          displayMode: "SQUISHED",
-          height: 45,
-          color: "#8B5CF6"
+          url: "data/tracks/hotspots.marker.bed",
+          displayMode: "EXPANDED",
+          nameField: "name",
+          height: 80,
+          featureHeight: 64,
+          color: "#DC2626",
+          altColor: "#DC2626"
         },
 
         // {
@@ -215,8 +212,37 @@
       ]
     };
 
-    let faiIndex = null;
-    window.sequenceRequests = {};
+    const hiddenFields = new Set(["phase"]);
+
+    const fieldLabelMap = {
+      Name: "Feature name",
+      "Feature name": "Feature name",
+      Type: "Feature type",
+      "Feature type": "Feature type",
+      Source: "Annotation source",
+      "Annotation source": "Annotation source",
+      Location: "Genome location",
+      "Genome location": "Genome location",
+      gene: "Gene",
+      gene_biotype: "Gene biotype",
+      Dbxref: "Database reference",
+      gbkey: "GenBank feature key",
+      pseudo: "Pseudogene",
+      inference: "Inference"
+    };
+
+    function formatFieldLabel(name) {
+      const raw = String(name).trim();
+      if (Object.prototype.hasOwnProperty.call(fieldLabelMap, raw)) {
+        return fieldLabelMap[raw];
+      }
+
+      const lower = raw.toLowerCase();
+      const matchedKey = Object.keys(fieldLabelMap).find(
+        (key) => key.toLowerCase() === lower
+      );
+      return matchedKey ? fieldLabelMap[matchedKey] : raw;
+    }
 
     function escapeHtml(value) {
       if (value === undefined || value === null) return "";
@@ -228,208 +254,16 @@
         .replaceAll("'", "&#039;");
     }
 
-    function getPopoverValue(popoverData, possibleNames) {
-      for (const item of popoverData) {
-        if (!item || !item.name) continue;
-
-        const itemName = String(item.name).toLowerCase();
-
-        for (const name of possibleNames) {
-          if (itemName === name.toLowerCase()) {
-            return item.value;
-          }
-        }
-      }
-      return "";
-    }
-
-    function parseLocation(locationText) {
-      if (!locationText) return null;
-
-      const clean = String(locationText).replaceAll(",", "").trim();
-      const match = clean.match(/^([^:]+):(\d+)-(\d+)/);
-
-      if (!match) return null;
-
-      const chrom = match[1];
-      const start1 = Number(match[2]);
-      const end = Number(match[3]);
-
-      return {
-        chrom,
-        start1,
-        start0: start1 - 1,
-        end,
-        length: end - start1 + 1
-      };
-    }
-
-    async function loadFaiIndex() {
-      if (faiIndex) return faiIndex;
-
-      const response = await fetch(faiURL);
-      if (!response.ok) {
-        throw new Error("Failed to load FAI: " + faiURL);
-      }
-
-      const text = await response.text();
-      const index = {};
-
-      for (const line of text.trim().split(/\r?\n/)) {
-        const cols = line.split("\t");
-        if (cols.length < 5) continue;
-
-        index[cols[0]] = {
-          length: Number(cols[1]),
-          offset: Number(cols[2]),
-          lineBases: Number(cols[3]),
-          lineWidth: Number(cols[4])
-        };
-      }
-
-      faiIndex = index;
-      return faiIndex;
-    }
-
-    async function fetchFastaSequence(chrom, start0, end0) {
-      const index = await loadFaiIndex();
-      const rec = index[chrom];
-
-      if (!rec) {
-        throw new Error("Contig not found in FAI: " + chrom);
-      }
-
-      if (start0 < 0) start0 = 0;
-      if (end0 > rec.length) end0 = rec.length;
-
-      if (end0 <= start0) {
-        throw new Error("Invalid region: " + chrom + ":" + start0 + "-" + end0);
-      }
-
-      const byteStart =
-        rec.offset +
-        Math.floor(start0 / rec.lineBases) * rec.lineWidth +
-        (start0 % rec.lineBases);
-
-      const lastBase0 = end0 - 1;
-
-      const byteEnd =
-        rec.offset +
-        Math.floor(lastBase0 / rec.lineBases) * rec.lineWidth +
-        (lastBase0 % rec.lineBases);
-
-      const response = await fetch(fastaURL, {
-        headers: {
-          Range: `bytes=${byteStart}-${byteEnd}`
-        }
-      });
-
-      if (!response.ok && response.status !== 206) {
-        throw new Error("Failed to fetch FASTA range");
-      }
-
-      const text = await response.text();
-
-      return text
-        .replace(/[\r\n]/g, "")
-        .toUpperCase()
-        .slice(0, end0 - start0);
-    }
-
-    function reverseComplement(seq) {
-      const comp = {
-        A: "T",
-        T: "A",
-        G: "C",
-        C: "G",
-        N: "N",
-        a: "t",
-        t: "a",
-        g: "c",
-        c: "g",
-        n: "n"
-      };
-
-      return seq
-        .split("")
-        .reverse()
-        .map(base => comp[base] || "N")
-        .join("")
-        .toUpperCase();
-    }
-
-    window.loadGeneSequenceFromRegion = async function (requestId) {
-      const req = window.sequenceRequests[requestId];
-      const target = document.getElementById("seq-" + requestId);
-
-      if (!req || !target) return;
-
-      target.textContent = "Loading sequence from FASTA...";
-
-      try {
-        const previewLength = 1000;
-        const previewStart0 = req.start0;
-        const previewEnd0 = Math.min(req.end, req.start0 + previewLength);
-
-        let seq = await fetchFastaSequence(
-          req.chrom,
-          previewStart0,
-          previewEnd0
-        );
-
-        if (req.strand === "-") {
-          seq = reverseComplement(seq);
-        }
-
-        target.innerHTML = `
-          <div>
-            <b>Sequence preview</b>:
-            first ${seq.length} bp / full ${req.length} bp
-          </div>
-          <div class="sequence-preview">${escapeHtml(seq)}</div>
-        `;
-      } catch (error) {
-        console.error(error);
-        target.textContent = "Sequence load failed: " + error.message;
-      }
-    };
-
     igv.createBrowser(document.getElementById("igv-div"), options)
-      .then(function (browser) {
+      .then(async function (browser) {
         window.igvBrowser = browser;
-        console.log("IGV browser created", browser);
+        await browser.search(initialLocus);
+        console.log("IGV browser created at", initialLocus, browser);
 
         browser.on("trackclick", function (track, popoverData) {
           if (!track || track.name !== "Gene annotation") {
             return;
           }
-
-          console.log("Clicked track:", track.name);
-          console.log("Popover data:", popoverData);
-
-          const name = getPopoverValue(popoverData, ["Name"]);
-          const gene = getPopoverValue(popoverData, ["gene", "gene_name"]);
-          const type = getPopoverValue(popoverData, ["Type"]);
-
-          let chrom = getPopoverValue(popoverData, ["chrom"]);
-          let start0 = Number(getPopoverValue(popoverData, ["start0"]));
-          let start1 = Number(getPopoverValue(popoverData, ["start1"]));
-          let end = Number(getPopoverValue(popoverData, ["end"]));
-          let strand = getPopoverValue(popoverData, ["strand"]) || ".";
-
-          if (!chrom || !Number.isFinite(start0) || !Number.isFinite(end)) {
-            const locationText = getPopoverValue(popoverData, ["Location"]);
-            const region = parseLocation(locationText);
-
-            if (region) {
-              chrom = region.chrom;
-              start0 = region.start0;
-              start1 = region.start1;
-              end = region.end;
-            }
-          }
-
-          const length = end - start0;
 
           let html = `
             <div style="max-width: 760px; font-size: 13px;">
@@ -440,60 +274,16 @@
 
           for (const item of popoverData) {
             if (!item || !item.name) continue;
+            if (hiddenFields.has(String(item.name).trim().toLowerCase())) continue;
 
             html += `
               <div>
-                <b>${escapeHtml(item.name)}</b>: ${escapeHtml(item.value)}
+                <b>${escapeHtml(formatFieldLabel(item.name))}</b>: ${escapeHtml(item.value)}
               </div>
             `;
           }
-
-          html += `<hr/>`;
-
-          if (!chrom || !Number.isFinite(start0) || !Number.isFinite(end)) {
-            html += `
-              <div style="font-weight: 700;">Gene sequence</div>
-              <div style="color: #b00020;">
-                Could not parse gene location.
-              </div>
-            </div>
-            `;
-            return html;
-          }
-
-          const requestId = "gene_" + Math.random().toString(36).slice(2);
-
-          window.sequenceRequests[requestId] = {
-            name,
-            gene,
-            type,
-            chrom,
-            start0,
-            start1,
-            end,
-            strand,
-            length
-          };
-
-          html += `
-            <div style="font-weight: 700;">Gene sequence</div>
-            <div><b>Gene</b>: ${escapeHtml(gene || name || "unknown")}</div>
-            <div><b>Feature name</b>: ${escapeHtml(name || "")}</div>
-            <div><b>Feature type</b>: ${escapeHtml(type || "")}</div>
-            <div><b>Location</b>: ${escapeHtml(chrom)}:${escapeHtml(start1)}-${escapeHtml(end)} (${escapeHtml(strand)})</div>
-            <div><b>Length</b>: ${escapeHtml(length)} bp</div>
-
-            <button onclick="window.loadGeneSequenceFromRegion('${requestId}')">
-              Load sequence preview
-            </button>
-
-            <div id="seq-${requestId}" style="margin-top: 8px; color: #667085;">
-              Click the button to load sequence.
-            </div>
-          `;
 
           html += `</div>`;
-
           return html;
         });
       })

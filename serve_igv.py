@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import io
 import os
 import shutil
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
@@ -12,8 +11,16 @@ from pathlib import Path
 
 
 class RangeHTTPRequestHandler(SimpleHTTPRequestHandler):
+    def _should_disable_cache(self) -> bool:
+        path = self.path.split("?", 1)[0]
+        return path == "/" or path.endswith((".html", ".htm"))
+
     def end_headers(self) -> None:
         self.send_header("Accept-Ranges", "bytes")
+        if self._should_disable_cache():
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Pragma", "no-cache")
+            self.send_header("Expires", "0")
         super().end_headers()
 
     def do_GET(self) -> None:
@@ -94,3 +101,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+# kill $(lsof -t -i :8020)
