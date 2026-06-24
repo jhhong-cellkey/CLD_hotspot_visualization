@@ -59,6 +59,127 @@
       min-height: 720px;
     }
 
+    .sequence-preview {
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 220px;
+      overflow-y: auto;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      margin-top: 8px;
+      line-height: 1.45;
+    }
+
+    .hotspot-sequence-card {
+      margin-top: 16px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+
+    .hotspot-sequence-card h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+    }
+
+    .hotspot-sequence-meta {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .hotspot-sequence-actions {
+      margin-bottom: 8px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .hotspot-download-toggle,
+    .hotspot-txt-download {
+      appearance: none;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      background: #ffffff;
+      color: var(--label);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 7px 12px;
+      cursor: pointer;
+    }
+
+    .hotspot-download-toggle:hover:not(:disabled),
+    .hotspot-txt-download:hover:not(:disabled) {
+      background: #f8fafc;
+      border-color: #94a3b8;
+    }
+
+    .hotspot-download-toggle:disabled,
+    .hotspot-txt-download:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .hotspot-download-panel {
+      margin-top: 12px;
+      padding: 12px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #f8fafc;
+    }
+
+    .hotspot-download-panel h4 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+    }
+
+    .download-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: var(--label);
+    }
+
+    .download-option input[type="radio"] {
+      margin: 0;
+    }
+
+    .download-flank-input {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 10px 22px;
+      font-size: 13px;
+      color: var(--label);
+    }
+
+    .download-flank-input input {
+      width: 88px;
+      padding: 5px 8px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .download-flank-input.is-disabled {
+      opacity: 0.45;
+    }
+
+    .download-region-summary {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.5;
+    }
+
     /*
       IGV 기본 track label box를 덜 촌스럽게 보이게 하는 CSS.
       igv.js 버전에 따라 class명이 조금 다를 수 있음.
@@ -116,6 +237,65 @@
     <div class="browser-card">
       <div id="igv-div"></div>
     </div>
+
+    <div class="hotspot-sequence-card" id="hotspot-sequence-card" hidden>
+      <h3>Hotspot sequence</h3>
+      <div class="hotspot-sequence-meta" id="hotspot-sequence-meta"></div>
+      <div class="hotspot-sequence-actions">
+        <button
+          type="button"
+          class="hotspot-download-toggle"
+          id="hotspot-download-toggle"
+          disabled
+        >
+          TXT download options
+        </button>
+      </div>
+      <div class="sequence-preview" id="hotspot-sequence-preview"></div>
+      <div class="hotspot-download-panel" id="hotspot-download-panel" hidden>
+        <h4>TXT download</h4>
+        <label class="download-option">
+          <input
+            type="radio"
+            name="download-scope"
+            id="download-scope-hotspot"
+            value="hotspot"
+            checked
+          />
+          Hotspot only
+        </label>
+        <label class="download-option">
+          <input
+            type="radio"
+            name="download-scope"
+            id="download-scope-flank"
+            value="flank"
+          />
+          Hotspot ± flank
+        </label>
+        <label class="download-flank-input is-disabled" id="download-flank-wrap">
+          Flank size (kb)
+          <input
+            type="number"
+            id="download-flank-kb"
+            value="300"
+            min="1"
+            max="5000"
+            step="1"
+            disabled
+          />
+        </label>
+        <div class="download-region-summary" id="download-region-summary"></div>
+        <button
+          type="button"
+          class="hotspot-txt-download"
+          id="hotspot-txt-download"
+          disabled
+        >
+          Download TXT
+        </button>
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -124,6 +304,11 @@
     const fastaURL = "data/genome/PICRH.fa";
     const faiURL = "data/genome/PICRH.fa.fai";
     const initialLocus = "NW_023276806.1:81476323-82076323";
+    const hotspotFlankBp = 300_000;
+
+    let faiIndex = null;
+    let hotspotAnchors = null;
+    let activeHotspot = null;
 
     const options = {
       reference: {
@@ -154,8 +339,8 @@
           url: "data/tracks/hotspots.marker.bed",
           displayMode: "EXPANDED",
           nameField: "name",
-          height: 80,
-          featureHeight: 64,
+          height: 70,
+          featureHeight: 54,
           color: "#DC2626",
           altColor: "#DC2626"
         },
@@ -254,37 +439,464 @@
         .replaceAll("'", "&#039;");
     }
 
+    function getPopoverValue(popoverData, possibleNames) {
+      for (const item of popoverData) {
+        if (!item || !item.name) continue;
+
+        const itemName = String(item.name).toLowerCase();
+        for (const name of possibleNames) {
+          if (itemName === name.toLowerCase()) {
+            return item.value;
+          }
+        }
+      }
+      return "";
+    }
+
+    function parseLocation(locationText) {
+      if (!locationText) return null;
+
+      const clean = String(locationText).replaceAll(",", "").trim();
+      const match = clean.match(/^([^:]+):(\d+)-(\d+)/);
+      if (!match) return null;
+
+      const chrom = match[1];
+      const start1 = Number(match[2]);
+      const end = Number(match[3]);
+
+      return { chrom, start1, start0: start1 - 1, end };
+    }
+
+    async function loadHotspotAnchors() {
+      if (hotspotAnchors) return hotspotAnchors;
+
+      const response = await fetch("data/tracks/hotspots.bed");
+      if (!response.ok) {
+        throw new Error("Failed to load hotspots.bed");
+      }
+
+      const anchors = {};
+      for (const line of (await response.text()).trim().split(/\r?\n/)) {
+        if (!line || line.startsWith("#")) continue;
+        const cols = line.split("\t");
+        if (cols.length < 4) continue;
+        anchors[cols[3]] = {
+          chrom: cols[0],
+          start0: Number(cols[1]),
+          end0: Number(cols[2])
+        };
+      }
+
+      hotspotAnchors = anchors;
+      return anchors;
+    }
+
+    async function loadFaiIndex() {
+      if (faiIndex) return faiIndex;
+
+      const response = await fetch(faiURL);
+      if (!response.ok) {
+        throw new Error("Failed to load FAI: " + faiURL);
+      }
+
+      const text = await response.text();
+      const index = {};
+
+      for (const line of text.trim().split(/\r?\n/)) {
+        const cols = line.split("\t");
+        if (cols.length < 5) continue;
+
+        index[cols[0]] = {
+          length: Number(cols[1]),
+          offset: Number(cols[2]),
+          lineBases: Number(cols[3]),
+          lineWidth: Number(cols[4])
+        };
+      }
+
+      faiIndex = index;
+      return faiIndex;
+    }
+
+    async function fetchFastaSequence(chrom, start0, end0) {
+      const index = await loadFaiIndex();
+      const rec = index[chrom];
+
+      if (!rec) {
+        throw new Error("Contig not found in FAI: " + chrom);
+      }
+
+      if (start0 < 0) start0 = 0;
+      if (end0 > rec.length) end0 = rec.length;
+      if (end0 <= start0) {
+        throw new Error("Invalid region: " + chrom + ":" + start0 + "-" + end0);
+      }
+
+      const byteStart =
+        rec.offset +
+        Math.floor(start0 / rec.lineBases) * rec.lineWidth +
+        (start0 % rec.lineBases);
+
+      const lastBase0 = end0 - 1;
+      const byteEnd =
+        rec.offset +
+        Math.floor(lastBase0 / rec.lineBases) * rec.lineWidth +
+        (lastBase0 % rec.lineBases);
+
+      const response = await fetch(fastaURL, {
+        headers: { Range: `bytes=${byteStart}-${byteEnd}` }
+      });
+
+      if (!response.ok && response.status !== 206) {
+        throw new Error("Failed to fetch FASTA range");
+      }
+
+      const text = await response.text();
+      return text.replace(/[\r\n]/g, "").toUpperCase().slice(0, end0 - start0);
+    }
+
+    function sanitizeFilename(name) {
+      return String(name).replace(/[^\w.-]+/g, "_");
+    }
+
+    function wrapSequence(seq, lineLen = 80) {
+      const lines = [];
+      for (let i = 0; i < seq.length; i += lineLen) {
+        lines.push(seq.slice(i, i + lineLen));
+      }
+      return lines.join("\n");
+    }
+
+    function hotspotFlankRegion(chrom, anchor0, flankBp = hotspotFlankBp) {
+      const chromLength = faiIndex?.[chrom]?.length;
+      const start0 = Math.max(0, anchor0 - flankBp);
+      const end0 = chromLength
+        ? Math.min(chromLength, anchor0 + flankBp)
+        : anchor0 + flankBp;
+      return { start0, end0, length: end0 - start0 };
+    }
+
+    function getSelectedFlankKb() {
+      const input = document.getElementById("download-flank-kb");
+      const value = Number(input?.value);
+      if (!Number.isFinite(value) || value <= 0) return hotspotFlankBp / 1000;
+      return value;
+    }
+
+    function getDownloadScope() {
+      const flankRadio = document.getElementById("download-scope-flank");
+      return flankRadio?.checked ? "flank" : "hotspot";
+    }
+
+    function getDownloadRegion(hotspot) {
+      if (!hotspot) return null;
+
+      if (getDownloadScope() === "hotspot") {
+        return {
+          label: "Hotspot",
+          start0: hotspot.start0,
+          end0: hotspot.end0,
+          length: hotspot.end0 - hotspot.start0
+        };
+      }
+
+      const flankBp = Math.round(getSelectedFlankKb() * 1000);
+      const region = hotspotFlankRegion(hotspot.chrom, hotspot.start0, flankBp);
+      return {
+        label: `±${getSelectedFlankKb()} kb`,
+        start0: region.start0,
+        end0: region.end0,
+        length: region.length
+      };
+    }
+
+    function updateDownloadPanelSummary() {
+      const summary = document.getElementById("download-region-summary");
+      const downloadButton = document.getElementById("hotspot-txt-download");
+      const flankWrap = document.getElementById("download-flank-wrap");
+      const flankInput = document.getElementById("download-flank-kb");
+      const useFlank = getDownloadScope() === "flank";
+
+      if (flankWrap) flankWrap.classList.toggle("is-disabled", !useFlank);
+      if (flankInput) flankInput.disabled = !useFlank;
+
+      if (!summary || !activeHotspot) {
+        if (summary) summary.textContent = "";
+        if (downloadButton) downloadButton.disabled = true;
+        return;
+      }
+
+      const region = getDownloadRegion(activeHotspot);
+      if (!region) {
+        summary.textContent = "";
+        if (downloadButton) downloadButton.disabled = true;
+        return;
+      }
+
+      summary.innerHTML = `
+        <div><b>Download region:</b> ${escapeHtml(region.label)}</div>
+        <div>${escapeHtml(activeHotspot.chrom)}:${escapeHtml(region.start0 + 1)}-${escapeHtml(region.end0)} (${region.length.toLocaleString()} bp)</div>
+      `;
+      if (downloadButton) downloadButton.disabled = false;
+    }
+
+    function setDownloadPanelOpen(open) {
+      const panel = document.getElementById("hotspot-download-panel");
+      const toggle = document.getElementById("hotspot-download-toggle");
+      if (!panel || !toggle) return;
+
+      panel.hidden = !open;
+      toggle.textContent = open
+        ? "Hide TXT download options"
+        : "TXT download options";
+
+      if (open) {
+        updateDownloadPanelSummary();
+        panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+
+    function resetDownloadPanel() {
+      const hotspotRadio = document.getElementById("download-scope-hotspot");
+      const flankInput = document.getElementById("download-flank-kb");
+      if (hotspotRadio) hotspotRadio.checked = true;
+      if (flankInput) flankInput.value = String(hotspotFlankBp / 1000);
+      setDownloadPanelOpen(false);
+      updateDownloadPanelSummary();
+    }
+
+    function resolveHotspotInfo(popoverData) {
+      const name = getPopoverValue(popoverData, ["Name", "name"]);
+      let chrom = getPopoverValue(popoverData, ["chrom"]);
+      let start0 = Number(getPopoverValue(popoverData, ["start0"]));
+      let end0 = Number(getPopoverValue(popoverData, ["end"]));
+
+      if (!chrom || !Number.isFinite(start0) || !Number.isFinite(end0)) {
+        const locationText = getPopoverValue(popoverData, ["Location"]);
+        const region = parseLocation(locationText);
+        if (region) {
+          chrom = region.chrom;
+          start0 = region.start0;
+          end0 = region.end;
+        }
+      }
+
+      const anchor = name && hotspotAnchors?.[name];
+      if (anchor) {
+        return {
+          name,
+          chrom: anchor.chrom,
+          start0: anchor.start0,
+          end0: anchor.end0
+        };
+      }
+
+      return { name, chrom, start0, end0 };
+    }
+
+    async function downloadHotspotTxt() {
+      if (!activeHotspot) return;
+
+      const button = document.getElementById("hotspot-txt-download");
+      const region = getDownloadRegion(activeHotspot);
+      if (!region) return;
+
+      const { name, chrom } = activeHotspot;
+      const { start0, end0 } = region;
+      const originalLabel = button?.textContent || "Download TXT";
+
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Downloading TXT...";
+      }
+
+      try {
+        await loadFaiIndex();
+        const seq = await fetchFastaSequence(chrom, start0, end0);
+        const header = [
+          `Hotspot: ${name || "Hotspot"}`,
+          `Region: ${chrom}:${start0 + 1}-${end0}`,
+          `Scope: ${region.label}`,
+          `Length: ${seq.length}`,
+          ""
+        ].join("\n");
+        const text = header + wrapSequence(seq) + "\n";
+        const blob = new Blob([text], { type: "text/plain" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download =
+          sanitizeFilename(name || "hotspot") +
+          `_${chrom}_${start0 + 1}-${end0}.txt`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error(error);
+        alert("TXT download failed: " + error.message);
+      } finally {
+        if (button) {
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }
+        updateDownloadPanelSummary();
+      }
+    }
+
+    async function showHotspotSequencePanel(popoverData) {
+      const card = document.getElementById("hotspot-sequence-card");
+      const meta = document.getElementById("hotspot-sequence-meta");
+      const preview = document.getElementById("hotspot-sequence-preview");
+      const downloadToggle = document.getElementById("hotspot-download-toggle");
+      const hotspot = resolveHotspotInfo(popoverData);
+
+      if (!card || !meta || !preview) return;
+      if (
+        !hotspot.chrom ||
+        !Number.isFinite(hotspot.start0) ||
+        !Number.isFinite(hotspot.end0) ||
+        hotspot.end0 <= hotspot.start0
+      ) {
+        card.hidden = true;
+        activeHotspot = null;
+        if (downloadToggle) downloadToggle.disabled = true;
+        resetDownloadPanel();
+        return;
+      }
+
+      card.hidden = false;
+      preview.textContent = "Loading hotspot sequence...";
+      resetDownloadPanel();
+
+      try {
+        await loadFaiIndex();
+        const hotspotName = hotspot.name || "Hotspot";
+        const hotspotLength = hotspot.end0 - hotspot.start0;
+
+        activeHotspot = {
+          name: hotspotName,
+          chrom: hotspot.chrom,
+          start0: hotspot.start0,
+          end0: hotspot.end0
+        };
+
+        meta.innerHTML = `
+          <div><b>${escapeHtml(hotspotName)}</b></div>
+          <div>Hotspot: ${escapeHtml(hotspot.chrom)}:${escapeHtml(hotspot.start0 + 1)}-${escapeHtml(hotspot.end0)} (${hotspotLength} bp)</div>
+          <div id="hotspot-preview-status">Preview: loading hotspot sequence...</div>
+        `;
+        if (downloadToggle) downloadToggle.disabled = false;
+        updateDownloadPanelSummary();
+
+        const seq = await fetchFastaSequence(
+          hotspot.chrom,
+          hotspot.start0,
+          hotspot.end0
+        );
+
+        const status = document.getElementById("hotspot-preview-status");
+        if (status) {
+          status.textContent = `Preview: hotspot sequence (${seq.length} bp)`;
+        }
+        preview.textContent = seq;
+      } catch (error) {
+        console.error(error);
+        meta.textContent = "Sequence load failed: " + error.message;
+        preview.textContent = "";
+        activeHotspot = null;
+        if (downloadToggle) downloadToggle.disabled = true;
+        resetDownloadPanel();
+      }
+    }
+
+    function buildGenePopover(popoverData) {
+      let html = `
+        <div style="max-width: 760px; font-size: 13px;">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+            Gene information
+          </div>
+      `;
+
+      for (const item of popoverData) {
+        if (!item || !item.name) continue;
+        if (hiddenFields.has(String(item.name).trim().toLowerCase())) continue;
+
+        html += `
+          <div>
+            <b>${escapeHtml(formatFieldLabel(item.name))}</b>: ${escapeHtml(item.value)}
+          </div>
+        `;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function buildHotspotPopover(popoverData) {
+      let html = `
+        <div style="max-width: 760px; font-size: 13px;">
+          <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
+            Hotspot information
+          </div>
+      `;
+
+      for (const item of popoverData) {
+        if (!item || !item.name) continue;
+        if (String(item.name).trim().toLowerCase() === "score") continue;
+        html += `
+          <div>
+            <b>${escapeHtml(item.name)}</b>: ${escapeHtml(item.value)}
+          </div>
+        `;
+      }
+
+      html += `
+        <div style="margin-top: 8px; color: #667085;">
+          Hotspot sequence is shown in the panel below. Click <b>TXT download options</b> to choose what to download.
+        </div>
+      </div>`;
+
+      return html;
+    }
+
+    document
+      .getElementById("hotspot-download-toggle")
+      ?.addEventListener("click", function () {
+        const panel = document.getElementById("hotspot-download-panel");
+        setDownloadPanelOpen(Boolean(panel?.hidden));
+      });
+
+    document
+      .getElementById("hotspot-txt-download")
+      ?.addEventListener("click", downloadHotspotTxt);
+
+    for (const id of [
+      "download-scope-hotspot",
+      "download-scope-flank",
+      "download-flank-kb"
+    ]) {
+      document.getElementById(id)?.addEventListener("input", updateDownloadPanelSummary);
+      document.getElementById(id)?.addEventListener("change", updateDownloadPanelSummary);
+    }
+
     igv.createBrowser(document.getElementById("igv-div"), options)
       .then(async function (browser) {
         window.igvBrowser = browser;
+        await Promise.all([loadHotspotAnchors(), loadFaiIndex()]);
         await browser.search(initialLocus);
         console.log("IGV browser created at", initialLocus, browser);
 
         browser.on("trackclick", function (track, popoverData) {
-          if (!track || track.name !== "Gene annotation") {
-            return;
+          if (!track) return;
+
+          if (track.name === "Gene annotation") {
+            return buildGenePopover(popoverData);
           }
 
-          let html = `
-            <div style="max-width: 760px; font-size: 13px;">
-              <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
-                Gene information
-              </div>
-          `;
-
-          for (const item of popoverData) {
-            if (!item || !item.name) continue;
-            if (hiddenFields.has(String(item.name).trim().toLowerCase())) continue;
-
-            html += `
-              <div>
-                <b>${escapeHtml(formatFieldLabel(item.name))}</b>: ${escapeHtml(item.value)}
-              </div>
-            `;
+          if (track.name === "Hotspots") {
+            showHotspotSequencePanel(popoverData);
+            return buildHotspotPopover(popoverData);
           }
-
-          html += `</div>`;
-          return html;
         });
       })
       .catch(function (error) {

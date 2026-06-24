@@ -16,3 +16,14 @@ ln -sfn /nvme1/hotspot/ChIP_seq/final_chipseq2/macs3_peaks/Tp5/H3K4me3/Tp5_H3K4m
 ln -sfn /nvme1/hotspot/ChIP_seq/final_chipseq2/macs3_peaks/Tp5/H3K9me3/Tp5_H3K9me3_BSF_0128_C5HP5ACXX_7_Library_E_1_2_H3K9me3_Tp5.PICRH.sorted_FE.bw data/tracks/Tp5_H3K9me3.bw
 ln -sfn /nvme1/hotspot/ChIP_seq/final_chipseq2/macs3_peaks/Tp5/H3K27ac/Tp5_H3K27ac_BSF_0116_C55NLACXX_2_Library_E_1_6_H3K27ac_Tp5.PICRH.sorted_FE.bw data/tracks/Tp5_H3K27ac.bw
 ```
+
+## Hotspot sequence extraction (±300 kb)
+
+```bash
+python extract_hotspot_sequences.py
+```
+
+Reads `data/tracks/hotspots.bed`, extracts ±300 kb around each hotspot start from `data/genome/PICRH.fa`, and writes:
+
+- `data/sequences/hotspots/Hotspot_1.fa` (per hotspot)
+- `data/sequences/hotspots_all.fa` (combined)
