@@ -15,6 +15,7 @@
       --text: #1f2933;
       --muted: #6b7280;
       --label: #334155;
+      --track-bg: #f0f2f5;
     }
 
     body {
@@ -205,12 +206,23 @@
       opacity: 0.8;
     }
 
-    .igv-track-div {
-      border-bottom: 1px solid #eef1f4 !important;
+    #igv-div .igv-ui-panel-row {
+      border-bottom: 1px solid #e2e6ea !important;
+      background-color: var(--track-bg) !important;
     }
 
-    .igv-scrollbar-outer-div {
-      background: #f8fafc !important;
+    #igv-div .igv-viewport,
+    #igv-div .igv-column,
+    #igv-div .igv-viewport-content {
+      background-color: var(--track-bg) !important;
+    }
+
+    #igv-div .igv-axis-column {
+      background-color: #fafbfc !important;
+    }
+
+    #igv-div .igv-scrollbar-column {
+      background-color: var(--track-bg) !important;
     }
 
     .igv-navbar {
@@ -305,6 +317,7 @@
     const faiURL = "data/genome/PICRH.fa.fai";
     const initialLocus = "NW_023276806.1:81476323-82076323";
     const hotspotFlankBp = 300_000;
+    const trackBackground = "#f0f2f5";
 
     let faiIndex = null;
     let hotspotAnchors = null;
@@ -320,6 +333,11 @@
 
       locus: initialLocus,
 
+      trackDefaults: {
+        annotation: { background: trackBackground },
+        wig: { background: trackBackground }
+      },
+
       tracks: [
         {
           name: "Gene annotation",
@@ -329,9 +347,9 @@
           displayMode: "EXPANDED",
           nameField: "gene",
           height: 150,
-          color: "#2F3A4A"
+          color: "#2F3A4A",
+          background: trackBackground
         },
-
         {
           name: "Hotspots",
           type: "annotation",
@@ -342,9 +360,19 @@
           height: 70,
           featureHeight: 54,
           color: "#DC2626",
-          altColor: "#DC2626"
+          altColor: "#DC2626",
+          background: trackBackground
         },
-
+        {
+          name: "RNA expr (TPM, n=15)",
+          type: "wig",
+          format: "bedgraph",
+          url: "data/tracks/Visualization_GSE19750_gene_tpm.bedGraph",
+          graphType: "bar",
+          autoscale: true,
+          height: 70,
+          color: "#5B8DB8"
+        },
         // {
         //   name: "RNA expression",
         //   type: "annotation",
@@ -356,13 +384,14 @@
         // },
 
         {
-          name: "RNA expression",
+          name: "RNA coverage",
           type: "wig",
           format: "bigwig",
           url: "data/tracks/RNAseq_mean_CPM.bw",
           autoscale: true,
           height: 60,
-          color: "#2F80ED"
+          color: "#2F80ED",
+          background: trackBackground
         },
 
         {
@@ -372,7 +401,8 @@
           url: "data/tracks/Tp5_H3K4me3.bw",
           autoscale: true,
           height: 72,
-          color: "#B22222"
+          color: "#B22222",
+          background: trackBackground
         },
 
         {
@@ -382,7 +412,8 @@
           url: "data/tracks/Tp5_H3K9me3.bw",
           autoscale: true,
           height: 72,
-          color: "#1F2A44"
+          color: "#1F2A44",
+          background: trackBackground
         },
 
         {
@@ -392,29 +423,57 @@
           url: "data/tracks/Tp5_H3K27ac.bw",
           autoscale: true,
           height: 72,
-          color: "#E07A5F"
+          color: "#E07A5F",
+          background: trackBackground
         }
       ]
     };
 
-    const hiddenFields = new Set(["phase"]);
+    const geneVisibleFields = [
+      ["gene", "gene"],
+      ["location", "Location"],
+      ["type", "Type"],
+      ["gene_biotype", "gene_biotype"],
+      ["gbkey", "gbkey"],
+      ["source", "Source"],
+      ["dbxref", "Dbxref"],
+      ["transcript_id", "transcript_id"]
+    ];
 
     const fieldLabelMap = {
-      Name: "Feature name",
-      "Feature name": "Feature name",
-      Type: "Feature type",
-      "Feature type": "Feature type",
-      Source: "Annotation source",
-      "Annotation source": "Annotation source",
       Location: "Genome location",
       "Genome location": "Genome location",
+      Type: "Feature type",
+      "Feature type": "Feature type",
       gene: "Gene",
       gene_biotype: "Gene biotype",
-      Dbxref: "Database reference",
-      gbkey: "GenBank feature key",
-      pseudo: "Pseudogene",
-      inference: "Inference"
+      gbkey: "GenBank feature type",
+      Source: "Annotation provider",
+      "Annotation source": "Annotation provider",
+      Dbxref: "GeneID",
+      transcript_id: "Transcript ID"
     };
+
+    function setPopoverFieldValue(map, key, value) {
+      if (value === undefined || value === null || String(value).trim() === "") {
+        return;
+      }
+
+      const existing = map.get(key);
+      if (existing === undefined || String(existing).trim() === "") {
+        map.set(key, value);
+      }
+    }
+
+    function formatGenePopoverValue(fieldKey, value) {
+      if (fieldKey !== "dbxref") return value;
+
+      const text = String(value).trim();
+      const match = text.match(/GeneID:(\d+)/i);
+      if (match) return match[1];
+
+      return text.replace(/^GeneID:/i, "").trim();
+    }
 
     function formatFieldLabel(name) {
       const raw = String(name).trim();
@@ -809,7 +868,21 @@
       }
     }
 
+    function normalizePopoverFieldName(name) {
+      return String(name).trim().replace(/:+$/, "").toLowerCase();
+    }
+
     function buildGenePopover(popoverData) {
+      const valueByField = new Map();
+      for (const item of popoverData) {
+        if (!item?.name) continue;
+        if (typeof item.name !== "string") continue;
+        if (item.name.trim() === "<hr/>") continue;
+
+        const key = normalizePopoverFieldName(item.name);
+        setPopoverFieldValue(valueByField, key, item.value);
+      }
+
       let html = `
         <div style="max-width: 760px; font-size: 13px;">
           <div style="font-weight: 700; font-size: 14px; margin-bottom: 6px;">
@@ -817,13 +890,17 @@
           </div>
       `;
 
-      for (const item of popoverData) {
-        if (!item || !item.name) continue;
-        if (hiddenFields.has(String(item.name).trim().toLowerCase())) continue;
+      for (const [fieldKey, labelKey] of geneVisibleFields) {
+        if (!valueByField.has(fieldKey)) continue;
+        const rawValue = valueByField.get(fieldKey);
+        if (rawValue === undefined || rawValue === null || String(rawValue).trim() === "") {
+          continue;
+        }
+        const value = formatGenePopoverValue(fieldKey, rawValue);
 
         html += `
           <div>
-            <b>${escapeHtml(formatFieldLabel(item.name))}</b>: ${escapeHtml(item.value)}
+            <b>${escapeHtml(formatFieldLabel(labelKey))}</b>: ${escapeHtml(value)}
           </div>
         `;
       }
@@ -879,11 +956,27 @@
       document.getElementById(id)?.addEventListener("change", updateDownloadPanelSummary);
     }
 
+    function applyTrackBackgrounds(browser) {
+      if (!browser?.trackViews) return;
+
+      for (const trackView of browser.trackViews) {
+        const track = trackView.track;
+        if (!track || track.type === "sequence") continue;
+        track.background = trackBackground;
+      }
+
+      if (typeof browser.updateViews === "function") {
+        browser.updateViews();
+      }
+    }
+
     igv.createBrowser(document.getElementById("igv-div"), options)
       .then(async function (browser) {
         window.igvBrowser = browser;
+        applyTrackBackgrounds(browser);
         await Promise.all([loadHotspotAnchors(), loadFaiIndex()]);
         await browser.search(initialLocus);
+        applyTrackBackgrounds(browser);
         console.log("IGV browser created at", initialLocus, browser);
 
         browser.on("trackclick", function (track, popoverData) {
